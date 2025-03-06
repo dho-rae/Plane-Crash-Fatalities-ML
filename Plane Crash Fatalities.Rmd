@@ -1,0 +1,248 @@
+---
+title: "Plane Crash Fatalities"
+output: pdf_document
+date: "2024-08-14"
+---
+
+```{r setup, include=FALSE}
+install.packages("grid")
+
+library(grid)
+```
+
+# Plane Crash Fatalities
+
+**Author:** Raeesa Dhoda
+
+### Introduction
+
+Despite significant advancements in both technology and safety protocols, plane crashes still pose a grave threat. Understanding the factors that contribute to plane crash fatalities could inform preventive measures in the aviation industry.
+
+This project explores a dataset (<https://www.kaggle.com/code/abeperez/exploring-trends-on-passenger-airline-crashes>) containing a record of every aircraft mishap between the years of 1918 and 2022, some of which culminated in fatalities and others of which did not.
+
+It delineates every flight record that suffered a crash in that interval, and the following information pertinent to each record:
+
+-   Airline operator
+-   Region in which the accident took place
+-   Number of passengers aboard
+-   Consequential fatalities
+-   Reason for the calamity
+
+The objective of this research is to assess the relationship between various factors, such as *region*, *flight_type* or *crash_cause*, and the number of fatalities in plane crashes. By answering the following research questions, we aim to uncover patterns or associations that could potentially guide improvements in aviation safety standards:
+
+1.  Is there a significant difference in the number of fatalities between any two flight types (let us examine the most frequent two)?
+
+2.  Is there a significant difference in the proportion of flights that result in fatalities between the aforementioned flight types?
+
+3.  Does the cause of the crash significantly affect the likelihood of fatalities?
+
+4.  How does the region affect the number of fatalities in plane crashes?
+
+------------------------------------------------------------------------
+
+```{r load_data}
+plane_crashes <- read.csv("/Users/raeesauser/Desktop/CS555_Foundations_of_Machine_Learning/Plane Crashes Database.csv")
+plane_crashes <- data.frame(plane_crashes)
+plane_crashes$year <- substr(plane_crashes$date, 1, 4)
+plane_crashes$date <- NULL
+plane_crashes$flight_phase <- NULL
+columns <- c("operator", "flight_type", "country", "region", "total_on_board",
+             "crew_on_board", "crew_fatalities", "passengers_on_board",
+             "passenger_fatalities", "total_fatalities", "total_survivors", 
+             "crash_cause", "year")
+plane_crashes <- na.omit(plane_crashes[columns])
+plane_crashes$has_fatalities <- ifelse(plane_crashes$total_fatalities > 0, 1, 0)
+plane_crashes <- plane_crashes[plane_crashes$region != "World", ]
+
+head(plane_crashes)
+
+set.seed(3286)
+
+sampled_plane_crashes <- plane_crashes[sample(nrow(plane_crashes), 1000), ]
+```
+
+I have created an additional binary parameter, *has_fatalities*, to indicate whether a flight was casualty-free in spite of its crash or whether at least one fatality occurred as a consequence. 0 indicates no fatalities, and 1 is indicative of at least one.
+
+To preprocess the data for analysis as it were, I have removed null values and thereby avoided potential biases or inaccuracies.
+
+We also take a random sample of 1000 records to lessen the computational load and make our large data set more manageable for the following analyses, all whilst maintaining robustness.
+
+------------------------------------------------------------------------
+
+#### Question 1: Is there a significant difference in the number of fatalities between the two most frequent flight types?
+
+```{r pressure, echo=FALSE}
+flight_type_counts <- table(plane_crashes$flight_type)
+
+sorted_flight_type_counts <- sort(flight_type_counts, decreasing = TRUE)
+
+top_two_flight_types <- head(sorted_flight_type_counts, 2)
+
+top_two_flight_types
+
+#Two-Sample Mean Test
+
+alpha <- 0.05
+
+flight_type1 <- sampled_plane_crashes[which(sampled_plane_crashes$flight_type == "Commercial"),]$total_fatalities
+
+flight_type2 <- sampled_plane_crashes[which(sampled_plane_crashes$flight_type == "Operational"),]$total_fatalities
+
+t_test_result <- t.test(flight_type1, flight_type2, alternative = 'two.sided', conf.level = (1 - alpha))
+t_test_result
+
+par(mar = c(5, 8, 4, 3)) 
+
+boxplot(total_fatalities ~ flight_type, data = sampled_plane_crashes, 
+        main = "Fatalities by Flight Type", xlab = 'Total Fatalities', ylab = '', 
+        las = 2, horizontal = TRUE, cex.axis = 0.7, cex.lab = 0.8)
+```
+
+I want to evaluate the difference in the number of fatalities between the two most frequent flight types, namely Commercial and Operational flights.
+
+We use the t-test generally to determine whether there are significant differences between the means of two independent groups. In this case, it allows us to compare the average number of fatalities in both types of flights.
+
+With both a t-statistic of the above magnitude as well as the associated p-value of 9.4e-08, we can infer that there is indeed a highly statistically significant difference between the two, with Commercial flights having a greatly higher average number of fatalities.
+
+The low p-value also suggests that the observed difference is not due to random chance.
+
+The confidence interval, 6.25 to 13.25, for the true difference in means does not include zero, reinforcing our conclusion that there is a higher risk or severity associated with Commercial flight crashes.
+
+The boxplot corroborates the t-test even by exhibiting a greater variability in the count of fatalities for Commercial flights comparatively. However, the presence of outliers does serve to highlight extreme cases that might influence the overall mean.
+
+------------------------------------------------------------------------
+
+#### Question 2: Is there a significant difference in the proportion of flights that result in fatalities between Commercial and Operational flights?
+
+```{r pressure, echo=FALSE}
+#Proportion Test
+
+flight_type1 <- "Commercial"
+flight_type2 <- "Operational"
+
+count_fatalities_ft1 <- sum(plane_crashes$flight_type == flight_type1 
+                            & plane_crashes$has_fatalities == 1)
+
+total_flights_ft1 <- sum(plane_crashes$flight_type == flight_type1)
+
+count_fatalities_ft2 <- sum(plane_crashes$flight_type == flight_type2 
+                            & plane_crashes$has_fatalities == 1)
+
+total_flights_ft2 <- sum(plane_crashes$flight_type == flight_type2)
+
+alpha <- 0.05
+
+prop_test_result <- prop.test(c(count_fatalities_ft1, count_fatalities_ft2),
+                              c(total_flights_ft1, total_flights_ft2),
+                              conf.level = (1 - alpha),
+                              alternative = "greater", 
+                              correct = FALSE)
+prop_test_result
+```
+
+Above, we understood the difference in fatality count between Commercial and Operational flights. However, in order to make a well-rounded conclusion we should compare the relative proportions of either flight types with fatalities.
+
+Let our null hypothesis be that there is no difference in proportions between Commercial and Operational flights and our alternative hypothesis be that the proportion of fatal flights does differ between either flight type.
+
+Generally, a proportion test would be used to compare two proportions. Here it serves to assess the relative risk of fatalities in the two flight types.
+
+From the proportion test conducted above, the p-value of 1 indicates that there is no statistically significant difference between the proportions of fatalities in either flight type, even in spite of observed proportions. We therefore cannot reject the null hypothesis.
+
+The confidence interval is consistent with this, in that it includes 0 and also ranges from negative to positive values.
+
+Ultimately, there is no significant evidence to support the claim that the proportion of fatalities is greater in one flight type compared to the other. So whilst the severity of fatalities might differ as we discovered previously, the likelihood of a crash resulting in fatalities is similar across both flight types.
+
+------------------------------------------------------------------------
+
+#### Question 3: Does the cause of the crash significantly affect the likelihood of fatalities?
+
+```{r pressure, echo=FALSE}
+#ANOVA
+
+fatalities_by_crash_cause <- aggregate(total_fatalities ~ crash_cause, 
+                                       data = plane_crashes, sum)
+
+sum_fatalities <- sum(fatalities_by_crash_cause$total_fatalities)
+
+fatalities_by_crash_cause$percentage <- (fatalities_by_crash_cause$total_fatalities / sum_fatalities) * 100
+
+fatalities_by_crash_cause <- fatalities_by_crash_cause[order(fatalities_by_crash_cause$percentage, 
+                                                             decreasing = TRUE), ]
+
+barplot(fatalities_by_crash_cause$percentage,
+        names.arg = fatalities_by_crash_cause$crash_cause,
+        main = "Percentage of Total Fatalities by Cause of Crash",
+        xlab = "Crash Cause", ylab = "% of Total Fatalities", las = 2, 
+        cex.names = 0.7, ylim = c(0, 100))
+
+par(mar = c(5, 3, 4, 2)) 
+
+mosaicplot(crash_cause ~ has_fatalities, 
+           data = plane_crashes, 
+           main = "Mosaic Plot of Crash Cause vs. Has Fatalities", 
+           xlab = "Crash Cause", 
+           ylab = "Has Fatalities", 
+           color = TRUE)
+
+anova_model <- aov(has_fatalities ~ crash_cause, data = sampled_plane_crashes)
+summary(anova_model)
+```
+
+The bar plot provides a clear visualisation of which crash causes are most deadly.
+
+The mosaic plot similarly reveals to us how certain crash causes are more likely associated with fatalities.
+
+Notice that although almost half of all occurrences can be attributed to human error, the cause with the highest fatality rate is not that but rather terrorism.
+
+To determine whether the cause of the crash significantly affects the occurrence of fatalities we perform the ANOVA test which typically compares the means of three or more groups to determine whether at least one differs significantly.
+
+The very small p-value indicates that the effect that the crash cause has on the likelihood of fatalities is decidedly statistically significant.
+
+The F-value, 9.712, is by contrast relatively large which reinforces this same idea.
+
+Given these, we can conclude that the causes of crashes do play a significant role in determining whether fatalities occur because the differences in proportions of fatalities among different crash causes are, again, statistically significant.
+
+------------------------------------------------------------------------
+
+#### Question 4: How does the region affect the number of fatalities in plane crashes?
+
+```{r pressure, echo=FALSE}
+#Simple Linear Regression
+
+fatalities_by_region <- aggregate(total_fatalities ~ region, 
+                                  data = plane_crashes, sum)
+
+fatalities_by_region <- fatalities_by_region[order(fatalities_by_region$total_fatalities, 
+                                                   decreasing = TRUE), ]
+
+par(mar = c(9, 5, 4, 1)) 
+
+barplot(fatalities_by_region$total_fatalities,
+        names.arg = fatalities_by_region$region,
+        main = "Total Fatalities by Region", xlab = "region",
+        ylab = "Total Fatalities", las = 2, cex.names = 0.7, ylim = c(0, 50000)) 
+
+linear_model <- lm(total_fatalities ~ region, data = sampled_plane_crashes)
+summary(linear_model)
+
+```
+
+The barplot above illustrates which regions in fact have the highest fatalities.
+
+Moreover, to examine the relationship between region and fatality count we shall construct a linear regression model. Linear regression is used to model the relationship between a dependent variable, in this instance *total_fatalities*, and one or more independent variables, *region*.
+
+The low F-statistic value, 1.456, indicates that *region* does not significantly explain a significant proportion of the variance in *total_fatalities*.
+
+The model has a very low R-squared value, suggesting that other factors are likely more influential in determining the number of fatalities in plane crashes.
+
+------------------------------------------------------------------------
+
+### Conclusion
+
+All in all, this analysis sheds insight into the factors influencing plane crash fatalities. Our findings indicate that certain flight types and crash causes significantly impact the severity and likelihood of fatalities, whereas regional differences appear to have a less pronounced effect.
+
+To further enhance the robustness of our conclusions, I would advise increasing the sample size to capture a broader range of incidents and reduce the impact of random variations.
+
+Additionally, sifting for outliers might highlight unique circumstances that warrant separate investigation and may even currently be skewing the overall results.
+
+Future studies could always consider incorporating a wider array of variables to develop a more comprehensive understanding of the factors that contribute to plane crash outcomes and ultimately better predict and mitigate the risks associated with aviation incidents.
