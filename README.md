@@ -50,6 +50,3 @@ The analysis seeks to answer the following:
 - **Libraries:** dplyr, ggplot2, base R functions
 - **Statistical Methods:** t-tests, proportion tests, ANOVA, linear regression
 - **Data Visualisation:** Boxplots, bar plots, mosaic plots
-
----
-This study provides valuable insights into aviation safety and accident severity, helping inform future preventive measures in air travel.
